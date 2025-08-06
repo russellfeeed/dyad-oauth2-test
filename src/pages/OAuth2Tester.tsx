@@ -17,6 +17,10 @@ type Step = "form" | "auth" | "exchange" | "result";
 
 const LS_KEY = "oauth2tester:form";
 
+// CHANGE THIS TO YOUR SUPABASE PROJECT ID IF NEEDED
+const SUPABASE_PROJECT_ID = "xziropvhidyvginabopy";
+const EDGE_FUNCTION_URL = `https://${SUPABASE_PROJECT_ID}.supabase.co/functions/v1/oauth2-proxy`;
+
 const defaultValues = {
   grantType: "authorization_code" as GrantType,
   authUrl: "",
@@ -75,7 +79,6 @@ export default function OAuth2Tester() {
     setForm((f) => ({
       ...f,
       grantType: value,
-      // Reset fields not needed for client_credentials
       ...(value === "client_credentials"
         ? { authUrl: "", extraAuthParams: "", redirectUri: window.location.origin + "/oauth2-callback" }
         : {}),
@@ -99,7 +102,6 @@ export default function OAuth2Tester() {
   }
 
   function parseExtra(extra: string) {
-    // extra params as key=value&key2=value2
     const out: Record<string, string> = {};
     extra.split("&").forEach((pair) => {
       const [k, v] = pair.split("=");
@@ -124,10 +126,9 @@ export default function OAuth2Tester() {
       ]);
       setStep("auth");
     } else {
-      // client_credentials: skip auth, go straight to token request
       setDebug([
         "Using Client Credentials grant type.",
-        "Exchanging client credentials for token...",
+        "Exchanging client credentials for token via Edge Function...",
         `POST ${form.tokenUrl}`,
       ]);
       handleClientCredentialsExchange();
@@ -143,33 +144,30 @@ export default function OAuth2Tester() {
         scope: form.scope,
         ...parseExtra(form.extraTokenParams),
       };
-      const body = new URLSearchParams(params as any).toString();
       setDebug((d) => [
         ...d,
-        "Request body:",
-        body,
+        "Request body (sent to Edge Function):",
+        JSON.stringify(params, null, 2),
       ]);
-      const res = await fetch(form.tokenUrl, {
+      const res = await fetch(EDGE_FUNCTION_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tokenUrl: form.tokenUrl,
+          params,
+        }),
       });
-      const text = await res.text();
+      const json = await res.json();
       setDebug((d) => [
         ...d,
-        `Response status: ${res.status}`,
-        "Response body:",
-        text,
+        `Edge Function response status: ${res.status}`,
+        "Token endpoint response status: " + json.status,
+        "Token endpoint response body:",
+        typeof json.data === "string"
+          ? json.data
+          : JSON.stringify(json.data, null, 2),
       ]);
-      let json;
-      try {
-        json = JSON.parse(text);
-      } catch {
-        json = null;
-      }
-      setTokenResult(json || text);
+      setTokenResult(json.data);
       setStep("result");
     } catch (err: any) {
       setError(err.message || "Unknown error");
@@ -182,7 +180,7 @@ export default function OAuth2Tester() {
     setDebug((d) => [
       ...d,
       "",
-      "Exchanging code for token...",
+      "Exchanging code for token via Edge Function...",
       `POST ${form.tokenUrl}`,
     ]);
     try {
@@ -194,33 +192,30 @@ export default function OAuth2Tester() {
         client_secret: form.clientSecret,
         ...parseExtra(form.extraTokenParams),
       };
-      const body = new URLSearchParams(params as any).toString();
       setDebug((d) => [
         ...d,
-        "Request body:",
-        body,
+        "Request body (sent to Edge Function):",
+        JSON.stringify(params, null, 2),
       ]);
-      const res = await fetch(form.tokenUrl, {
+      const res = await fetch(EDGE_FUNCTION_URL, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tokenUrl: form.tokenUrl,
+          params,
+        }),
       });
-      const text = await res.text();
+      const json = await res.json();
       setDebug((d) => [
         ...d,
-        `Response status: ${res.status}`,
-        "Response body:",
-        text,
+        `Edge Function response status: ${res.status}`,
+        "Token endpoint response status: " + json.status,
+        "Token endpoint response body:",
+        typeof json.data === "string"
+          ? json.data
+          : JSON.stringify(json.data, null, 2),
       ]);
-      let json;
-      try {
-        json = JSON.parse(text);
-      } catch {
-        json = null;
-      }
-      setTokenResult(json || text);
+      setTokenResult(json.data);
       setStep("result");
     } catch (err: any) {
       setError(err.message || "Unknown error");
