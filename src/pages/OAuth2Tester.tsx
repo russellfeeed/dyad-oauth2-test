@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 type GrantType = "authorization_code" | "client_credentials";
 type Step = "form" | "auth" | "exchange" | "result";
@@ -65,6 +66,8 @@ export default function OAuth2Tester() {
   const [tokenResult, setTokenResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Persist form to localStorage on change
   useEffect(() => {
@@ -277,6 +280,46 @@ export default function OAuth2Tester() {
     }));
   }
 
+  // Export settings as JSON file
+  function handleExport() {
+    const data = JSON.stringify(form, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "oauth2tester-settings.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: "Settings exported", description: "Settings downloaded as JSON file." });
+  }
+
+  // Import settings from JSON file
+  function handleImportClick() {
+    fileInputRef.current?.click();
+  }
+
+  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const imported = JSON.parse(event.target?.result as string);
+        // Only update known keys
+        const newForm = { ...defaultValues, ...imported };
+        setForm(newForm);
+        toast({ title: "Settings imported", description: "Settings loaded from file." });
+      } catch (err: any) {
+        toast({ title: "Import failed", description: "Invalid JSON file.", variant: "destructive" });
+      }
+    };
+    reader.readAsText(file);
+    // Reset input so same file can be re-imported if needed
+    e.target.value = "";
+  }
+
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-50">
       <Card className="w-full max-w-xl shadow-lg">
@@ -289,6 +332,25 @@ export default function OAuth2Tester() {
               You must be logged in to use this tool.
             </div>
           )}
+
+          {/* Export/Import Buttons */}
+          <div className="flex gap-2 mb-4">
+            <Button type="button" variant="secondary" onClick={handleExport}>
+              Export Settings
+            </Button>
+            <Button type="button" variant="secondary" onClick={handleImportClick}>
+              Import Settings
+            </Button>
+            <input
+              type="file"
+              accept="application/json"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={handleImportFile}
+              tabIndex={-1}
+            />
+          </div>
+
           <form className="space-y-4" onSubmit={handleFormSubmit}>
             <div>
               <Label>Grant Type</Label>
