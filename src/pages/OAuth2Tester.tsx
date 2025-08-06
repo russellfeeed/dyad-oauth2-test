@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 type Step = "form" | "auth" | "exchange" | "result";
+
+const LS_KEY = "oauth2tester:form";
 
 const defaultValues = {
   authUrl: "",
@@ -38,13 +40,28 @@ function appendPath(url: string, path: string) {
 }
 
 export default function OAuth2Tester() {
-  const [form, setForm] = useState(defaultValues);
+  const [form, setForm] = useState(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        return { ...defaultValues, ...JSON.parse(raw) };
+      }
+    } catch {}
+    return defaultValues;
+  });
   const [step, setStep] = useState<Step>("form");
   const [authUrl, setAuthUrl] = useState("");
   const [code, setCode] = useState("");
   const [debug, setDebug] = useState<string[]>([]);
   const [tokenResult, setTokenResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Persist form to localStorage on change
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(form));
+    } catch {}
+  }, [form]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -145,6 +162,9 @@ export default function OAuth2Tester() {
     setDebug([]);
     setTokenResult(null);
     setError(null);
+    try {
+      localStorage.removeItem(LS_KEY);
+    } catch {}
   }
 
   function handleAppendAuthPath() {
