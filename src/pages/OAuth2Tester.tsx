@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
 
 type GrantType = "authorization_code" | "client_credentials";
 type Step = "form" | "auth" | "exchange" | "result";
@@ -63,6 +64,7 @@ export default function OAuth2Tester() {
   const [debug, setDebug] = useState<string[]>([]);
   const [tokenResult, setTokenResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   // Persist form to localStorage on change
   useEffect(() => {
@@ -70,6 +72,26 @@ export default function OAuth2Tester() {
       localStorage.setItem(LS_KEY, JSON.stringify(form));
     } catch {}
   }, [form]);
+
+  // Get Supabase access token
+  useEffect(() => {
+    let mounted = true;
+    async function fetchToken() {
+      const { data } = await supabase.auth.getSession();
+      if (mounted) {
+        setAccessToken(data.session?.access_token ?? null);
+      }
+    }
+    fetchToken();
+    // Listen for auth state changes
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAccessToken(session?.access_token ?? null);
+    });
+    return () => {
+      mounted = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -151,7 +173,10 @@ export default function OAuth2Tester() {
       ]);
       const res = await fetch(EDGE_FUNCTION_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({
           tokenUrl: form.tokenUrl,
           params,
@@ -199,7 +224,10 @@ export default function OAuth2Tester() {
       ]);
       const res = await fetch(EDGE_FUNCTION_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({
           tokenUrl: form.tokenUrl,
           params,
@@ -256,6 +284,11 @@ export default function OAuth2Tester() {
           <CardTitle>OAuth2 Tester</CardTitle>
         </CardHeader>
         <CardContent>
+          {!accessToken && (
+            <div className="mb-4 text-red-600">
+              You must be logged in to use this tool.
+            </div>
+          )}
           <form className="space-y-4" onSubmit={handleFormSubmit}>
             <div>
               <Label>Grant Type</Label>
@@ -369,7 +402,7 @@ export default function OAuth2Tester() {
                 placeholder="key1=val1&key2=val2"
               />
             </div>
-            <Button type="submit" className="w-full mt-2">
+            <Button type="submit" className="w-full mt-2" disabled={!accessToken}>
               {form.grantType === "authorization_code"
                 ? "Start OAuth2 Flow"
                 : "Request Token"}
@@ -398,7 +431,7 @@ export default function OAuth2Tester() {
               <Button
                 className="w-full"
                 onClick={handleExchange}
-                disabled={!code}
+                disabled={!code || !accessToken}
               >
                 Exchange Code for Token
               </Button>
