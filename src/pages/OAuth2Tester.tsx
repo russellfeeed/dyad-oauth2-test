@@ -9,12 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
+import { SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
+type GrantType = "authorization_code" | "client_credentials";
 type Step = "form" | "auth" | "exchange" | "result";
 
 const LS_KEY = "oauth2tester:form";
 
 const defaultValues = {
+  grantType: "authorization_code" as GrantType,
   authUrl: "",
   tokenUrl: "",
   clientId: "",
@@ -67,6 +71,22 @@ export default function OAuth2Tester() {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
   }
 
+  function handleGrantTypeChange(value: GrantType) {
+    setForm((f) => ({
+      ...f,
+      grantType: value,
+      // Reset fields not needed for client_credentials
+      ...(value === "client_credentials"
+        ? { authUrl: "", extraAuthParams: "", redirectUri: window.location.origin + "/oauth2-callback" }
+        : {}),
+    }));
+    setStep("form");
+    setCode("");
+    setDebug([]);
+    setTokenResult(null);
+    setError(null);
+  }
+
   function buildAuthUrl() {
     const params = new URLSearchParams({
       response_type: "code",
@@ -91,16 +111,69 @@ export default function OAuth2Tester() {
   function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    const url = buildAuthUrl();
-    setAuthUrl(url);
-    setDebug([
-      `Generated Authorization URL:`,
-      url,
-      "",
-      "1. Click 'Open Auth URL' to start the OAuth2 flow.",
-      "2. Authorize the app, then copy the 'code' from the redirect URL and paste it below.",
-    ]);
-    setStep("auth");
+    setDebug([]);
+    if (form.grantType === "authorization_code") {
+      const url = buildAuthUrl();
+      setAuthUrl(url);
+      setDebug([
+        `Generated Authorization URL:`,
+        url,
+        "",
+        "1. Click 'Open Auth URL' to start the OAuth2 flow.",
+        "2. Authorize the app, then copy the 'code' from the redirect URL and paste it below.",
+      ]);
+      setStep("auth");
+    } else {
+      // client_credentials: skip auth, go straight to token request
+      setDebug([
+        "Using Client Credentials grant type.",
+        "Exchanging client credentials for token...",
+        `POST ${form.tokenUrl}`,
+      ]);
+      handleClientCredentialsExchange();
+    }
+  }
+
+  async function handleClientCredentialsExchange() {
+    try {
+      const params = {
+        grant_type: "client_credentials",
+        client_id: form.clientId,
+        client_secret: form.clientSecret,
+        scope: form.scope,
+        ...parseExtra(form.extraTokenParams),
+      };
+      const body = new URLSearchParams(params as any).toString();
+      setDebug((d) => [
+        ...d,
+        "Request body:",
+        body,
+      ]);
+      const res = await fetch(form.tokenUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body,
+      });
+      const text = await res.text();
+      setDebug((d) => [
+        ...d,
+        `Response status: ${res.status}`,
+        "Response body:",
+        text,
+      ]);
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch {
+        json = null;
+      }
+      setTokenResult(json || text);
+      setStep("result");
+    } catch (err: any) {
+      setError(err.message || "Unknown error");
+    }
   }
 
   async function handleExchange(e: React.FormEvent) {
@@ -188,8 +261,20 @@ export default function OAuth2Tester() {
           <CardTitle>OAuth2 Tester</CardTitle>
         </CardHeader>
         <CardContent>
-          {step === "form" && (
-            <form className="space-y-4" onSubmit={handleFormSubmit}>
+          <form className="space-y-4" onSubmit={handleFormSubmit}>
+            <div>
+              <Label>Grant Type</Label>
+              <Select value={form.grantType} onValueChange={handleGrantTypeChange}>
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="authorization_code">Authorization Code</SelectItem>
+                  <SelectItem value="client_credentials">Client Credentials</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {form.grantType === "authorization_code" && (
               <div>
                 <Label>Authorization URL</Label>
                 <div className="flex gap-2">
@@ -198,7 +283,7 @@ export default function OAuth2Tester() {
                     value={form.authUrl}
                     onChange={handleChange}
                     placeholder="https://provider.com/oauth2/authorize"
-                    required
+                    required={form.grantType === "authorization_code"}
                   />
                   <Button
                     type="button"
@@ -210,44 +295,46 @@ export default function OAuth2Tester() {
                   </Button>
                 </div>
               </div>
-              <div>
-                <Label>Token URL</Label>
-                <div className="flex gap-2">
-                  <Input
-                    name="tokenUrl"
-                    value={form.tokenUrl}
-                    onChange={handleChange}
-                    placeholder="https://provider.com/oauth2/token"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="whitespace-nowrap"
-                    onClick={handleAppendTokenPath}
-                  >
-                    +/oauth2/token
-                  </Button>
-                </div>
-              </div>
-              <div>
-                <Label>Client ID</Label>
+            )}
+            <div>
+              <Label>Token URL</Label>
+              <div className="flex gap-2">
                 <Input
-                  name="clientId"
-                  value={form.clientId}
+                  name="tokenUrl"
+                  value={form.tokenUrl}
                   onChange={handleChange}
+                  placeholder="https://provider.com/oauth2/token"
                   required
                 />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="whitespace-nowrap"
+                  onClick={handleAppendTokenPath}
+                >
+                  +/oauth2/token
+                </Button>
               </div>
-              <div>
-                <Label>Client Secret</Label>
-                <Input
-                  name="clientSecret"
-                  value={form.clientSecret}
-                  onChange={handleChange}
-                  type="password"
-                />
-              </div>
+            </div>
+            <div>
+              <Label>Client ID</Label>
+              <Input
+                name="clientId"
+                value={form.clientId}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <div>
+              <Label>Client Secret</Label>
+              <Input
+                name="clientSecret"
+                value={form.clientSecret}
+                onChange={handleChange}
+                type="password"
+              />
+            </div>
+            {form.grantType === "authorization_code" && (
               <div>
                 <Label>Redirect URI</Label>
                 <Input
@@ -257,15 +344,17 @@ export default function OAuth2Tester() {
                   required
                 />
               </div>
-              <div>
-                <Label>Scope</Label>
-                <Input
-                  name="scope"
-                  value={form.scope}
-                  onChange={handleChange}
-                  placeholder="e.g. openid email profile"
-                />
-              </div>
+            )}
+            <div>
+              <Label>Scope</Label>
+              <Input
+                name="scope"
+                value={form.scope}
+                onChange={handleChange}
+                placeholder="e.g. openid email profile"
+              />
+            </div>
+            {form.grantType === "authorization_code" && (
               <div>
                 <Label>Extra Auth Params</Label>
                 <Input
@@ -275,23 +364,25 @@ export default function OAuth2Tester() {
                   placeholder="key1=val1&key2=val2"
                 />
               </div>
-              <div>
-                <Label>Extra Token Params</Label>
-                <Input
-                  name="extraTokenParams"
-                  value={form.extraTokenParams}
-                  onChange={handleChange}
-                  placeholder="key1=val1&key2=val2"
-                />
-              </div>
-              <Button type="submit" className="w-full mt-2">
-                Start OAuth2 Flow
-              </Button>
-            </form>
-          )}
+            )}
+            <div>
+              <Label>Extra Token Params</Label>
+              <Input
+                name="extraTokenParams"
+                value={form.extraTokenParams}
+                onChange={handleChange}
+                placeholder="key1=val1&key2=val2"
+              />
+            </div>
+            <Button type="submit" className="w-full mt-2">
+              {form.grantType === "authorization_code"
+                ? "Start OAuth2 Flow"
+                : "Request Token"}
+            </Button>
+          </form>
 
-          {step === "auth" && (
-            <div className="space-y-4">
+          {form.grantType === "authorization_code" && step === "auth" && (
+            <div className="space-y-4 mt-6">
               <Button
                 className="w-full"
                 onClick={() => window.open(authUrl, "_blank")}
@@ -320,7 +411,7 @@ export default function OAuth2Tester() {
           )}
 
           {step === "result" && (
-            <div className="space-y-4">
+            <div className="space-y-4 mt-6">
               <div>
                 <Label>Token Response</Label>
                 <Textarea
