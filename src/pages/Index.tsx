@@ -1,22 +1,15 @@
-import { MadeWithDyad } from "@/components/made-with-dyad";
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import React from "react";
 
-const Index = () => {
+export default function Index() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
+        <h1 className="text-4xl font-bold mb-4">Welcome to Russell's OAuth2 Test App</h1>
         <p className="text-xl text-gray-600 mb-6">
           Start building your amazing project here!
         </p>
-        <Button asChild>
-          <Link to="/oauth2-tester">Try the OAuth2 Tester Tool</Link>
-        </Button>
       </div>
-      <MadeWithDyad />
+      {/* Add more content/components here */}
     </div>
   );
-};
-
-export default Index;
+}
