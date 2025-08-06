@@ -266,6 +266,20 @@ export default function OAuth2Tester() {
     } catch {}
   }
 
+  function handleClearSettings() {
+    setForm(defaultValues);
+    setStep("form");
+    setAuthUrl("");
+    setCode("");
+    setDebug([]);
+    setTokenResult(null);
+    setError(null);
+    try {
+      localStorage.removeItem(LS_KEY);
+    } catch {}
+    toast({ title: "Settings cleared", description: "All settings have been reset." });
+  }
+
   function handleAppendAuthPath() {
     setForm((f) => ({
       ...f,
@@ -333,13 +347,16 @@ export default function OAuth2Tester() {
             </div>
           )}
 
-          {/* Export/Import Buttons */}
+          {/* Export/Import/Clear Buttons */}
           <div className="flex gap-2 mb-4">
             <Button type="button" variant="secondary" onClick={handleExport}>
               Export Settings
             </Button>
             <Button type="button" variant="secondary" onClick={handleImportClick}>
               Import Settings
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleClearSettings}>
+              Clear Settings
             </Button>
             <input
               type="file"
