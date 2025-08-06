@@ -23,6 +23,20 @@ const defaultValues = {
   extraTokenParams: "",
 };
 
+function appendPath(url: string, path: string) {
+  if (!url) return path;
+  try {
+    const u = new URL(url);
+    if (u.pathname.endsWith(path)) return url;
+    u.pathname = u.pathname.replace(/\/$/, "") + path;
+    return u.toString();
+  } catch {
+    // Not a valid URL, just append
+    if (url.endsWith(path)) return url;
+    return url.replace(/\/$/, "") + path;
+  }
+}
+
 export default function OAuth2Tester() {
   const [form, setForm] = useState(defaultValues);
   const [step, setStep] = useState<Step>("form");
@@ -133,6 +147,20 @@ export default function OAuth2Tester() {
     setError(null);
   }
 
+  function handleAppendAuthPath() {
+    setForm((f) => ({
+      ...f,
+      authUrl: appendPath(f.authUrl, "/oauth2/authorize"),
+    }));
+  }
+
+  function handleAppendTokenPath() {
+    setForm((f) => ({
+      ...f,
+      tokenUrl: appendPath(f.tokenUrl, "/oauth2/token"),
+    }));
+  }
+
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-50">
       <Card className="w-full max-w-xl shadow-lg">
@@ -144,23 +172,43 @@ export default function OAuth2Tester() {
             <form className="space-y-4" onSubmit={handleFormSubmit}>
               <div>
                 <Label>Authorization URL</Label>
-                <Input
-                  name="authUrl"
-                  value={form.authUrl}
-                  onChange={handleChange}
-                  placeholder="https://provider.com/oauth2/authorize"
-                  required
-                />
+                <div className="flex gap-2">
+                  <Input
+                    name="authUrl"
+                    value={form.authUrl}
+                    onChange={handleChange}
+                    placeholder="https://provider.com/oauth2/authorize"
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="whitespace-nowrap"
+                    onClick={handleAppendAuthPath}
+                  >
+                    +/oauth2/authorize
+                  </Button>
+                </div>
               </div>
               <div>
                 <Label>Token URL</Label>
-                <Input
-                  name="tokenUrl"
-                  value={form.tokenUrl}
-                  onChange={handleChange}
-                  placeholder="https://provider.com/oauth2/token"
-                  required
-                />
+                <div className="flex gap-2">
+                  <Input
+                    name="tokenUrl"
+                    value={form.tokenUrl}
+                    onChange={handleChange}
+                    placeholder="https://provider.com/oauth2/token"
+                    required
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="whitespace-nowrap"
+                    onClick={handleAppendTokenPath}
+                  >
+                    +/oauth2/token
+                  </Button>
+                </div>
               </div>
               <div>
                 <Label>Client ID</Label>
