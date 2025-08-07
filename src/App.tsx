@@ -8,7 +8,7 @@ import NotFound from "./pages/NotFound";
 import OAuth2Tester from "./pages/OAuth2Tester";
 import Login from "./pages/Login";
 import { SessionContextProvider } from "@/components/SessionContextProvider";
-import { Analytics } from "@vercel/analytics/next";
+import { Analytics } from "@vercel/analytics/react";
 
 const queryClient = new QueryClient();
 
