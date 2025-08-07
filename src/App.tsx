@@ -9,6 +9,7 @@ import OAuth2Tester from "./pages/OAuth2Tester";
 import Login from "./pages/Login";
 import { SessionContextProvider } from "@/components/SessionContextProvider";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
         </SessionContextProvider>
       </BrowserRouter>
       <Analytics />
+      <SpeedInsights />
     </TooltipProvider>
   </QueryClientProvider>
 );
